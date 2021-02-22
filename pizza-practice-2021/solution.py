@@ -1,6 +1,5 @@
 import timeit
 import operator
-from multiprocessing import Pool
 
 rel_path = 'C:\GitHub\HashCodePractice2021\pizza-practice-2021\\'
 
@@ -9,8 +8,6 @@ path_b = 'b_little_bit_of_everything.in'
 path_c = 'c_many_ingredients.in'
 path_d = 'd_many_pizzas.in'
 path_e = 'e_many_teams.in'
-
-total = 0
 
 
 def sol(path):
@@ -34,53 +31,30 @@ def sol(path):
     index = 0
     max_ingredients = ordered[0][1]
 
-    np = len(ordered)
-    n4 = min(np / 4, teams4)
-    np -= n4 * 4
-    n3 = min(np / 3, teams3)
-    np -= n3 * 3
-    n2 = min(np / 2, teams2)
-    
-    # ordered = pizzas[:]
-
     while len(pizzas) > 0:
         maximum = ordered[index][1] + max_ingredients
         currMax = 0
         currIndex = 0
 
-        calc = True
+        step = 1
+        if len(pizzas) > 10:
+                step = 9
 
-        if n4 > 0 and len(ordered) % 4 == 0:
-            calc = False
-            n4 -= 1
-        if n3 > 0 and len(ordered) % 3 == 0:
-            calc = False
-            n3 -= 1
-        if n2 > 0 and len(ordered) % 2 == 0:
-            calc = False
-            n2 -= 1
+        for i in range(0, len(pizzas), step):
 
-        if calc == True:
-            step = 1
-            if len(pizzas) > 10:
-                    step = 5
+            if int(pizzas[i][1]) > currMax:
+                dif = difIngredients(pizzas[i], ordered[index])
+                
+                if dif == maximum:
+                    currMax = dif
+                    currIndex = i
+                    break
 
-            for i in range(0, len(pizzas), step):
-
-                if int(pizzas[i][1]) > currMax:
-                    dif = difIngredients(pizzas[i], ordered[index])
-                    
-                    if dif == maximum:
-                        currMax = dif
-                        currIndex = i
-                        break
-
-                    if dif > currMax:
-                        currMax = dif
-                        currIndex = i
-            
+                if dif > currMax:
+                    currMax = dif
+                    currIndex = i
+        
         ordered.append(pizzas.pop(currIndex))
-        index += 1
     
     n_ordered = len(ordered)
     deliveries = 0
@@ -135,7 +109,6 @@ def sol(path):
 
             f.write('2 ' + str(p1[0]) + ' ' + str(p2[0]) + '\n')
 
-    # total += totalScore
     print(path + ' -> score: ' + str(totalScore))
 
 
@@ -146,15 +119,12 @@ def difIngredients(p1, p2):
 
 def main():
     tic = timeit.default_timer()
-
-    with Pool(5) as pool:
-        pool.map(sol, [path_a, path_b, path_c, path_d, path_e])
-        # print('Overall score: ' + str(total))
-        # sol(path_a)
-        # sol(path_b)
-        # sol(path_c)
-        # sol(path_d)
-        # sol(path_e)
+    
+    sol(path_a)
+    sol(path_b)
+    sol(path_c)
+    sol(path_d)
+    sol(path_e)
 
     toc = timeit.default_timer()
     print('took ' + str(toc - tic) + ' seconds')
