@@ -18,42 +18,6 @@ path_d = 'd_tough_choices.txt'
 path_e = 'e_so_many_books.txt'
 path_f = 'f_libraries_of_the_world.txt'
 
-class SimAnnealSolver(Annealer):
-    def __init__(self, initial_state, libraries, maxDays):
-        self.libraries = libraries
-        self.maxDays = maxDays
-        self.orderCache = []
-        self.energyCache = 0
-
-        super(SimAnnealSolver, self).__init__(initial_state)
-    
-    def move(self):
-        initial_energy = self.energy()
-
-        # at least one of them must be in the 'useful' library range
-        usefulLimit = 0
-        days = 0
-        for i in range(len(self.state)):
-            days += self.libraries[self.state[i], 2]
-            if days >= self.maxDays:
-                usefulLimit = i
-                break
-
-        a = randInt(usefulLimit)
-        b = randInt(len(self.state))
-        self.state[a], self.state[b] = self.state[b], self.state[a]
-
-        return self.energy() - initial_energy
-    
-    def energy(self):
-        if self.state == self.orderCache:
-            return self.energyCache
-        else:
-            new_energy = -scoreOrder(self.state, self.libraries, self.maxDays)
-            self.orderCache = self.state[:]
-            self.energyCache = new_energy
-            return new_energy
-
 def SolveA(path):
     return 0
 
@@ -91,33 +55,8 @@ def SolveGeneral(path, steps):
     # ------------------- SORTING THE NUMPY ARRAY -------------------
     #
 
-    pred = sortingWeightFun(arr=libraries, reversed=True) # Reverse probably doesn't work with strings
-    order = np.argsort(pred) # array of indexes in order
-
-    #
-    # ------------- CHOOSING THE RIGHT ORDER OF LIBS ----------------
-    #
-
-    initial_guess = [i for i in range(len(libraries))]
-    #initial_guess = list(order)
-    #initial_guess = [47, 76, 79, 3, 22, 5, 8, 87, 78, 9, 54, 7, 12, 57, 83, 74, 55, 51, 20, 80, 48, 62, 18, 85, 27, 35, 11, 25, 28, 71, 30, 75, 65, 33, 63, 73, 84, 81, 38, 23, 41, 26, 69, 24, 44, 93, 16, 50, 2, 14, 29, 10, 52, 53, 1, 4, 6, 13, 0, 72, 60, 61, 19, 94, 89, 77, 15, 99, 68, 40, 70, 21, 39, 32, 42, 31, 95, 66, 92, 43, 67, 37, 59, 45, 46, 82, 86, 17, 88, 64, 90, 91, 58, 49, 34, 36, 96, 97, 98, 56]
-    
-    solver = SimAnnealSolver(initial_guess, libraries, nDays)
-    solver.copy_strategy = 'slice'
-
-    solver.Tmax = 75000
-    solver.Tmin = 500
-
-    #print('getting scheduler')
-    #solver.set_schedule(solver.auto(minutes=0.1))
-
-    solver.steps = steps
-    solver.updates = int(steps/2)
-    
-    print('started annealing')
-    (libsByOrder, fitness) = solver.anneal()
-    # print('done -> ')
-    # print(libsByOrder)
+    pred = sortingWeightFun(arr=libraries, totalDays=nDays, reversed=True) # Reverse probably doesn't work with strings
+    libsByOrder = np.argsort(pred) # array of indexes in order
 
     #
     # ---------------------- GETTING SOLUTION? ----------------------
@@ -158,11 +97,16 @@ def SolveGeneral(path, steps):
     return totalScore
 
 
-def sortingWeightFun(arr, reversed):
+def sortingWeightFun(arr, totalDays, reversed):
+    #nb = min(((totalDays / 1.5) - arr[:, 2]) * arr[:, 3], arr[:, 1])
+    #fitness = sum(arr[:, 4:(4+nb)])
+
+    fitness = arr[:, 0]
+    
     if(reversed):
-        return -arr[:, 0]
+        return -fitness
     else:
-        return arr[:, 0]
+        return fitness
 
 def scoreOrder(order, libraries, maxDays):
     fitness = 0
