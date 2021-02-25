@@ -21,7 +21,10 @@ path_f = 'f_libraries_of_the_world.txt'
 def SolveA(path):
     return 0
 
-def SolveGeneral(path, steps):
+def SolveGeneral(zip_arg):
+    path, vars_opt = zip_arg #use with pool
+    #path, vars_opt = list(zip_arg)[0] #use when without pool
+
     abs_path = rel_path + 'in\\' + path
 
     totalScore = 0
@@ -33,8 +36,8 @@ def SolveGeneral(path, steps):
     with open(abs_path, 'r') as f:
         [nBooks, nLibs, nDays] = [int(el) for el in f.readline().split()]
 
-        books = np.empty((nBooks, 2), dtype=np.int64) # [i, points]
-        libraries = np.empty((nLibs, nBooks + 4), dtype=np.int64) # [i, n books, ndays, books/day, book1, book2, ...]
+        books = np.empty((nBooks, 2), dtype=np.int32) # [i, points]
+        libraries = np.empty((nLibs, nBooks + 4), dtype=np.int32) # [i, n books, ndays, books/day, book1, book2, ...]
 
         books_split = f.readline().split()
         for i in range(len(books_split)):
@@ -55,8 +58,8 @@ def SolveGeneral(path, steps):
     # ------------------- SORTING THE NUMPY ARRAY -------------------
     #
 
-    pred = sortingWeightFun(arr=libraries, totalDays=nDays, reversed=True) # Reverse probably doesn't work with strings
-    libsByOrder = np.argsort(pred) # array of indexes in order
+    pred_res = np.array([sortingWeightFun(elem=e, totalDays=nDays, reversed=True, vars_opt=vars_opt) for e in libraries]) # Reverse probably doesn't work with strings
+    libsByOrder = np.argsort(pred_res, kind='stable') # array of indexes in order
 
     #
     # ---------------------- GETTING SOLUTION? ----------------------
@@ -72,8 +75,7 @@ def SolveGeneral(path, steps):
     currDay = 0
     for lib in libsByOrder:
         currDay += libraries[lib, 2]
-        booksToScan = (nDays - currDay) * libraries[lib, 3]
-
+        booksToScan = (nDays - currDay) * np.int64(libraries[lib, 3])
         booksValues = {}
 
         count = 0
@@ -97,11 +99,12 @@ def SolveGeneral(path, steps):
     return totalScore
 
 
-def sortingWeightFun(arr, totalDays, reversed):
-    #nb = min(((totalDays / 1.5) - arr[:, 2]) * arr[:, 3], arr[:, 1])
-    #fitness = sum(arr[:, 4:(4+nb)])
+def sortingWeightFun(elem, totalDays, reversed, vars_opt):
+    books = min(elem[1], elem[3] * (totalDays / 2 - elem[2]))
+    sum_books = sum(elem[4:(4+int(books))])
+    avg_books = sum_books / books
 
-    fitness = arr[:, 0]
+    fitness = elem[3] * vars_opt[0] + sum_books * vars_opt[1] + avg_books * vars_opt[2]
     
     if(reversed):
         return -fitness
@@ -146,47 +149,127 @@ def isOrderValid(libDict, libraries, maxDays):
     return True
 
 def sol(args):
-    if(args['type'] == 'A'):
-        ret = SolveGeneral(args['path'], 400)
     
+    if(args['type'] == 'A'):
+        func = SolveGeneral
+        path = args['path']
+        initial_guess = [1, 1, 1]
+        
     elif(args['type'] == 'B'):
-        ret = SolveGeneral(args['path'], 2000)
+        func = SolveGeneral
+        path = args['path']
+        initial_guess = [1, 1, 1]
     
     elif(args['type'] == 'C'):
-        ret = SolveGeneral(args['path'], 20)
+        func = SolveGeneral
+        path = args['path']
+        initial_guess = [1, 1, 1]
     
     elif(args['type'] == 'D'):
-        ret = SolveGeneral(args['path'], 5)
+        func = SolveGeneral
+        path = args['path']
+        initial_guess = [1, 1, 1]
     
     elif(args['type'] == 'E'):
-        ret = SolveGeneral(args['path'], 2500)
+        func = SolveGeneral
+        path = args['path']
+        initial_guess = [1, 1, 1]
     
     elif(args['type'] == 'F'):
-        ret = SolveGeneral(args['path'], 3500)
+        func = SolveGeneral
+        path = args['path']
+        initial_guess = [1, 1, 1]
+
+    # pool
+    rand_range = 4
+    nThreads = 5
+    while rand_range > 0.2:
+        with Pool(nThreads) as pool:
+            attemps = [initial_guess]
+            for i in range(1, nThreads):
+                attemps.append([0 for _ in initial_guess])
+                for ii in range(len(initial_guess)):
+                    attemps[i][ii] = initial_guess[ii] * (random.random() * rand_range - rand_range / 2 + 1)
+            path_list = [path for _ in attemps]
+            new_args = zip(path_list, attemps)
+            #print(list(new_args))
+            scores = pool.map(SolveGeneral, new_args)
+
+            max_index = indexOfMax(scores)
+            score = scores[max_index]
+            initial_guess = attemps[max_index]
+            print('' + args['type'] + ' curr max -> ' + str(score) + ' with ', initial_guess)
+        rand_range /= 1.3
+
+    # simple exec, no pool
+    # new_args = zip([path], [initial_guess])
+    # score = func(new_args)
     
-    print('' + args['type'] + ' -> ' + str(ret))
-    return ret
+    print('' + args['type'] + ' -> ' + str(score))
+    return score
 
 
 def main():
     tic = timeit.default_timer()
 
-    with Pool(8) as pool:
-        scores = pool.map(sol, [
-            {'path': path_a, 'type': 'A'}, 
-            {'path': path_b, 'type': 'B'},
-            {'path': path_c, 'type': 'C'},
-            {'path': path_d, 'type': 'D'},
-            {'path': path_e, 'type': 'E'},
-            {'path': path_f, 'type': 'F'}
-            ])
-        print('\n\nFinal score -> %d' % sum(scores))
-        print(scores)
+    scores = []
+
+    scores.append(sol({'path': path_a, 'type': 'A'}))
+    scores.append(sol({'path': path_b, 'type': 'B'}))
+    scores.append(sol({'path': path_c, 'type': 'C'}))
+    scores.append(sol({'path': path_d, 'type': 'D'}))
+    scores.append(sol({'path': path_e, 'type': 'E'}))
+    scores.append(sol({'path': path_f, 'type': 'F'}))
+
+    print('\n\nFinal score -> %d' % sum(scores))
+
+    # with Pool(8) as pool:
+    #     scores = pool.map(sol, [
+    #         {'path': path_a, 'type': 'A'}, 
+    #         {'path': path_b, 'type': 'B'},
+    #         {'path': path_c, 'type': 'C'},
+    #         {'path': path_d, 'type': 'D'},
+    #         {'path': path_e, 'type': 'E'},
+    #         {'path': path_f, 'type': 'F'}
+    #         ])
+    #     print('\n\nFinal score -> %d' % sum(scores))
+    #     print(scores)
 
     toc = timeit.default_timer()
     elapsed = toc - tic
     print('\ntook ' + str(int(elapsed / 60)) + ' minutes and ' + str(elapsed % 60) + ' seconds')
 
+class SimAnnealSolver(Annealer):
+    def __init__(self, initial_state, path):
+        self.path = path
+
+        self.stateCache = []
+        self.energyCache = 0
+
+        super(SimAnnealSolver, self).__init__(initial_state)
+    
+    def move(self):
+        initial_energy = self.energy()
+
+        i = randInt(len(self.state))
+        mult = random.random() * 2 #[0, 2[
+        
+        self.state[i] = mult * self.state[i]
+
+        return self.energy() - initial_energy
+    
+    def energy(self):
+        if self.state == self.stateCache:
+            return self.energyCache
+        else:
+            new_energy = -1 * SolveGeneral(args['path'], initial_guess[:])
+            
+            self.stateCache = self.state
+            self.energyCache = new_energy
+            return new_energy
+    
+    # def update(self, *args, **kwargs):
+    #     return
 
 #
 #   ------------------------- HELPER FUNCTIONS -------------------------

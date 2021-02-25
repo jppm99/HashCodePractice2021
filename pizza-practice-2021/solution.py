@@ -38,7 +38,7 @@ def sol(path):
 
         step = 1
         if len(pizzas) > 10:
-                step = 9
+                step = 1
 
         for i in range(0, len(pizzas), step):
 
